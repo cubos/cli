@@ -1,0 +1,99 @@
+#!/bin/bash -e
+#!# Script de deploy para o Deploy no Google App Engine usando Google Secret Manager
+#!#
+#!# Uso:
+#!#  deploy_app_engine [config_file]
+#!#
+#!# Variáveis de ambiente:
+#!#  - GOOGLE_SERVICE_ACCOUNT: base64 do JSON com as credenciais do serviço do Google
+#!#  - secret_name: nome da secret no Google Secret Manager
+#!#  - prefix: prefixo das variáveis para serem substituidas no arquivo de configuração (padrão: $) 
+
+. "$(dirname "${BASH_SOURCE[0]}")/helpers/_all.sh"
+
+needs_command gcloud
+needs_command base64
+needs_command sponge
+needs_command jq
+needs_command yq
+
+needs_env GOOGLE_SERVICE_ACCOUNT
+
+# User-defined variables
+CONFIG_FILE=${1:-app.yaml}
+SECRET_NAME=$secret_name
+PREFIX=${prefix:-\$}
+
+service_name=$(yq -r ".service" $CONFIG_FILE)
+
+if [[ "${service_name}" = "null" ]]; then
+  throw "Service is not defined in config file $CONFIG_FILE"
+fi
+
+prefix_name=${service_name^^}
+
+echo -e "${C_GOOGLE_CLOUD}DEPLOYING TO:\n"
+echo -e " ██████╗  █████╗ ███████╗"
+echo -e "██╔════╝ ██╔══██╗██╔════╝"
+echo -e "██║  ███╗███████║█████╗"
+echo -e "██║   ██║██╔══██║██╔══╝"
+echo -e "╚██████╔╝██║  ██║███████╗"
+echo -e " ╚═════╝ ╚═╝  ╚═╝╚══════╝"
+echo -e "${C_RESET}"
+
+# --- Configuring Cloud ---
+
+log_i "Setting up Google Cloud environment"
+
+echo $GOOGLE_SERVICE_ACCOUNT | base64 -d > credentials.json
+
+PROJECT_ID=$(jq '.project_id' -r credentials.json)
+
+gcloud auth activate-service-account --key-file=credentials.json --project=$PROJECT_ID
+
+# --- Fetching and Secrets ---
+
+if [ -n "$SECRET_NAME" ]; then
+  log_i "Fetching secrets from Google Secret Manager"
+
+  gcloud secrets versions access latest --secret $SECRET_NAME > secrets.yaml
+
+  cat secrets.yaml | yq . > secrets.json
+
+  log_i "Replacing secrets in config file"
+
+  paths=("" ".env_variables" ".automatic_scaling")
+
+  for path in "${paths[@]}"; do
+    keys=$(yq -r "${path:-"."} | to_entries[] | \"\(.key)\"" $CONFIG_FILE)
+
+    # --- Get keys in configuration file ---
+    for key in $keys; do
+      full_path="$path.$key"
+      value=$(yq -r "$full_path" $CONFIG_FILE)
+
+      # --- Check if value needs to be replaced ---
+      if [[ $value == $PREFIX* ]]; then
+        secret_path="${value#"$PREFIX"}"
+        custom_secret_path="${prefix_name}_${secret_path}"
+
+        custom_secret_value=$(jq -r ".$custom_secret_path" secrets.json)
+
+        # --- Check to use common variable or custom ---
+        if [[ "${custom_secret_value}" = "null" ]]; then
+          secret="\$secret.${secret_path}"
+        else
+          secret="\$secret.${custom_secret_path}"
+        fi
+
+        yq -Y --argfile secret secrets.json "$full_path |= ($secret // empty)" $CONFIG_FILE | sponge $CONFIG_FILE
+      fi
+    done
+  done
+fi
+
+# --- Deploying ---
+
+log_i "Starting deployment to Google App Engine..."
+
+gcloud app deploy --no-cache --quiet $CONFIG_FILE --promote --stop-previous-version --verbosity=warning

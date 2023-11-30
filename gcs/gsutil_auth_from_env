@@ -1,0 +1,28 @@
+#!/bin/bash
+set -e
+
+FILE="${!1}"
+
+if [ -z "$1" ] || [ -z "${!1}" ] || [ -f "$FILE" ]; then
+  echo -e "\033[31m⛔ Erro: A variável $1 deve ser do tipo Variable e conter um arquivo JSON em Base64" >&2
+  exit 1
+else
+  FILE_CONTENTS=$(echo "$FILE" | base64 -d || (
+    echo -e "\033[31m⛔ Erro: A variável $1 deve ser do tipo Variable e conter um arquivo JSON em Base64" >&2
+    exit 1
+  ))
+  CREDENTIAL_TYPE=$(echo "$FILE_CONTENTS" | jq -r '.type')
+  CREDENTIAL_PROJECT=$(echo "$FILE_CONTENTS" | jq -r '.project_id')
+  CREDENTIAL_ACCOUNT=$(echo "$FILE_CONTENTS" | jq -r '.client_email')
+
+  if [ "$CREDENTIAL_TYPE" != "service_account" ]; then
+    echo -e "\033[31m⛔ Erro: A variável $1 deve conter uma credencial válida de uma Service Account da GCP" >&2
+    exit 1
+  fi
+
+  echo -e "\033[96mℹ️ Projeto:\033[0m $CREDENTIAL_PROJECT"
+  echo -e "\033[96mℹ️ E-mail da Service Account:\033[0m $CREDENTIAL_ACCOUNT"
+
+  echo "$FILE_CONTENTS" > /root/.boto.auth
+  echo -e "\033[32m✔️ Credencial carregada com sucesso"
+fi

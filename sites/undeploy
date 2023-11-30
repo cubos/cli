@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+echo -e "\033[95m⚠ You're undeploying a development website! We hope you know what you're doing.\033[39m"
+export UNDEPLOY="true"
+deploy_site

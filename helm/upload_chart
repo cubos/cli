@@ -1,0 +1,54 @@
+#!/bin/bash
+set -e
+
+VARIABLES=(NXRM_PUBLISH_USERNAME NXRM_PUBLISH_PASSWORD NXRM_PUBLISH_REPOSITORY)
+
+for variable in "${VARIABLES[@]}"; do
+  if [ -z "${!variable}" ]; then
+    echo -e "\033[31m⚠ Erro: A variável de ambiente '$variable' não foi definida" >&2
+    exit 1
+  fi
+done
+
+CHART_FILE="$1"
+
+if [ -z "$CHART_FILE" ]; then
+  if [ -f helm/Chart.yaml ]; then
+    CHART_NAME=$(yq -r '.name' helm/Chart.yaml)
+    CHART_VERSION=$(yq -r '.version' helm/Chart.yaml)
+
+    if [ "$CHART_VERSION" = "0.0.0" ] && [ -n "$CI_COMMIT_TAG" ]; then
+      CHART_VERSION="$CI_COMMIT_TAG"
+    fi
+
+    if [ -f "${CHART_NAME}-${CHART_VERSION}.tgz" ]; then
+      CHART_FILE="${CHART_NAME}-${CHART_VERSION}.tgz"
+    fi
+  fi
+
+  if [ -z "$CHART_FILE" ]; then
+    echo -e "\033[31m⚠ Erro: O script deve ser invocado com o nome do arquivo do Chart como parâmetro" >&2
+    echo -e "Exemplo: upload_chart chart-1.0.0.tgz" >&2
+    echo -e "Dica: Seguindo o padrão da Cubos, você também pode ter o seu Chart.yaml na pasta 'helm' na raiz do projeto (helm/Chart.yaml), que iremos cuidar disso automagicamente pra você :)" >&2
+    exit 1
+  fi
+fi
+
+if [ ! -f "$CHART_FILE" ]; then
+  echo -e "\033[31m⚠ Erro: Arquivo '$CHART_FILE' não encontrado" >&2
+  exit 1
+fi
+
+CHART_FOLDER=$(tar tf "$CHART_FILE" | head -1 | cut -d"/" -f1)
+
+mkdir -p /tmp/helm_upload_chart
+tar xf "$CHART_FILE" -C /tmp/helm_upload_chart
+
+CHART_NAME=$(yq -r '.name' "/tmp/helm_upload_chart/$CHART_FOLDER/Chart.yaml")
+CHART_VERSION=$(yq -r '.version' "/tmp/helm_upload_chart/$CHART_FOLDER/Chart.yaml")
+
+rm -rf /tmp/helm_upload_chart
+
+echo -e "\033[96mℹ️ Publicando o chart '$CHART_NAME' versão '$CHART_VERSION' no repositório '$NXRM_PUBLISH_REPOSITORY'...\033[0m"
+curl -X PUT --fail --show-error --upload-file "$CHART_FILE" --silent --user "$NXRM_PUBLISH_USERNAME:$NXRM_PUBLISH_PASSWORD" "https://nexus.cubos.io/repository/$NXRM_PUBLISH_REPOSITORY/"
+echo -e "\033[32m✔️ Chart publicado com sucesso em https://nexus.cubos.io/repository/$NXRM_PUBLISH_REPOSITORY/$CHART_NAME-$CHART_VERSION.tgz"

@@ -1,0 +1,313 @@
+#!/bin/bash
+set -e
+
+log_env() {
+  echo -e "\033[36m\033[1m${1}: \033[39m\033[21m${2:-(undefined)}"
+}
+
+throw() {
+  echo -e "\033[91m\033[1m${1}\033[39m\033[21m" >&2
+  exit 1
+}
+
+dependencies=(
+  base64
+  firebase
+  jq
+  sponge
+)
+
+for dependency in "${dependencies[@]}"; do
+  if ! [ -x "$(command -v "${dependency}")" ]; then
+    throw "Error: ${dependency} is not installed"
+  fi
+done
+
+deploy_firebase() {
+  environment_vars=(
+    GOOGLE_SERVICE_ACCOUNT
+    SITE_ID
+  )
+
+  for environment_var in "${environment_vars[@]}"; do
+    if [ -z "${!environment_var}" ]; then
+      throw "Error: environment variable ${environment_var} is not set"
+    fi
+  done
+
+  echo "${GOOGLE_SERVICE_ACCOUNT}" | base64 -d > credentials.json
+  jq '.hosting.site = "'"${SITE_ID}"'"' firebase.json | sponge firebase.json
+
+  if [ ! -f ".firebaserc" ]; then
+    PROJECT_ID=$(jq '.project_id' -r credentials.json)
+    echo -e "{\n  \"projects\": {\n    \"default\": \"${PROJECT_ID}\"\n  }\n}\n" > .firebaserc
+    echo -e "\033[1m\033[36mℹ  .firebaserc was created automatically:\033[0m will deploy to '${PROJECT_ID}'"
+  fi
+
+  echo -e "section_start:$(date +%s):config[collapsed=true]\r\033[0K\033[34m\033[1mConfiguration File\033[0m"
+  echo -e "\033[1m\033[96m.firebaserc:\033[0m"
+  jq -C . .firebaserc
+  echo -e "\033[1m\033[96mfirebase.json:\033[0m"
+  jq -C . firebase.json
+  echo -e "section_end:$(date +%s):gcs\r\033[0K"
+
+  echo -e "section_start:$(date +%s):firebase[collapsed=false]\r\033[0K\033[34m\033[1mDeploy to Firebase\033[0m"
+  GOOGLE_APPLICATION_CREDENTIALS=credentials.json firebase deploy --only hosting:"${SITE_ID}" -m "Pipeline ${CI_PIPELINE_ID} - Build ${CI_BUILD_ID}"
+  echo -e "section_end:$(date +%s):firebase\r\033[0K"
+}
+
+# User-defined variables
+PUBLIC_FILES_DIR="${public_files_dir:-dist}"
+ENVIRONMENT="${environment:-dev}"
+GROUP="${group:-$CI_PROJECT_ROOT_NAMESPACE}"
+NAMESPACE="${namespace:-${GROUP}-${ENVIRONMENT}}"
+REDIRECT_404s_TO_INDEX="${redirect_404s_to_index:-true}"
+KUBERNETES_TOKEN_ENV="${kubernetes_token_env:-KUBERNETES_DEV_TOKEN}"
+PROJECT="${project:-site}"
+DEPLOY_BASE_DOMAIN="${CUBOS_DEV_SITE_DEPLOY_BASE_DOMAIN:-${GROUP}.cubos.dev}"
+DOMAIN="${domain:-${ENVIRONMENT}-${PROJECT}.${DEPLOY_BASE_DOMAIN}}"
+CERTIFICATE_SECRET="${certificate_secret:-cert-${DEPLOY_BASE_DOMAIN//./-}}"
+INGRESS_CLASS="${ingress:-private}"
+INGRESS_SUFFIX="${ingress_suffix}"
+FORCE_PRODUCTION_CLUSTER="${force_production_cluster:-false}"
+CLEAN_URLs="${clean_urls:-false}"
+DEPLOY_BUCKET_NAME="${CUBOS_DEV_SITE_DEPLOY_BUCKET:-cubos-dev-sites}"
+DEPLOY_CLUSTER="${CUBOS_DEV_SITE_DEPLOY_CLUSTER:-CUBOS_DEV}"
+CUSTOM_NGINX_RULES="${custom_nginx_rules}"
+
+if [ "${force_firebase_deploy}" = "true" ] || ([ "${trunk_based}" != "true" ] && ([ "${CI_COMMIT_REF_NAME}" = "master" ] || [ "${CI_COMMIT_REF_NAME}" = "main" ])); then
+  echo -e "\033[95mDEPLOYING TO:"
+  echo -e "██████╗ ██████╗ ██████╗ "
+  echo -e "██╔══██╗██╔══██╗██╔══██╗"
+  echo -e "██████╔╝██████╔╝██║  ██║"
+  echo -e "██╔═══╝ ██╔══██╗██║  ██║"
+  echo -e "██║     ██║  ██║██████╔╝"
+  echo -e "╚═╝     ╚═╝  ╚═╝╚═════╝ "
+  echo -e "\033[39m"
+
+  if [ ! -f firebase.json ]; then
+    cat <<FIREBASE_JSON > firebase.json
+{
+  "hosting": {
+    "public": "${PUBLIC_FILES_DIR}",
+    "ignore": ["firebase.json", "**/.*", "**/*.map", "**/*.map.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=900, stale-while-revalidate=180"
+          }
+        ]
+      },
+      {
+        "source":
+          "**/*.@(jpg|jpeg|gif|png|svg|webp|js|css|eot|otf|ttf|ttc|woff|woff2|font.css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=604800"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
+FIREBASE_JSON
+
+    if [ "${REDIRECT_404s_TO_INDEX}" != "true" ]; then
+      jq '.hosting.rewrites = []' firebase.json | sponge firebase.json
+    fi
+
+    if [ "${CLEAN_URLs}" == "true" ]; then
+      jq '.hosting.cleanUrls = true' firebase.json | sponge firebase.json
+    fi
+  fi
+
+  if [ "${UNDEPLOY}" == "true" ]; then
+    throw "It's not possible to undeploy a production website. It should be manually deleted on Firebase Hosting."
+  else
+    deploy_firebase
+  fi
+  exit 0
+fi
+
+if [ "${UNDEPLOY}" == "true" ]; then
+  echo -e "\033[93mUNDEPLOYING FROM:"
+else
+  echo -e "\033[93mDEPLOYING TO:"
+fi
+
+echo -e "██████╗ ███████╗██╗   ██╗"
+echo -e "██╔══██╗██╔════╝██║   ██║"
+echo -e "██║  ██║█████╗  ██║   ██║"
+echo -e "██║  ██║██╔══╝  ╚██╗ ██╔╝"
+echo -e "██████╔╝███████╗ ╚████╔╝ "
+echo -e "╚═════╝ ╚══════╝  ╚═══╝  "
+echo -e "\033[39m"
+
+echo "-- DEVELOPMENT SITE DEPLOY CONFIG --"
+log_env "Public Files Directory" "${PUBLIC_FILES_DIR}"
+log_env "Environment" "${ENVIRONMENT}"
+log_env "Namespace" "${NAMESPACE}"
+log_env "Should redirect 404's to index.html" "${REDIRECT_404s_TO_INDEX}"
+log_env "Domain" "${DOMAIN}"
+log_env "Ingress Class" "${INGRESS_CLASS}"
+log_env "Ingress Suffix" "${INGRESS_SUFFIX}"
+
+echo "------------------------------------"
+
+DANGEROUS_NGINX_RULES=(
+  "load_module"
+  "lua_package"
+  "_by_lua"
+  "location"
+  "root"
+  "proxy_pass"
+  "serviceaccount"
+  "\{"
+  "\}"
+  "'"
+)
+
+# [CVE-2021-25742] https://github.com/kubernetes/ingress-nginx/blob/main/docs/user-guide/nginx-configuration/configmap.md#annotation-value-word-blocklist
+DANGEROUS_NGINX_RULES_PATTERN=$(IFS="|"; echo "${DANGEROUS_NGINX_RULES[*]}")
+
+if [[ "$CUSTOM_NGINX_RULES" =~ $DANGEROUS_NGINX_RULES_PATTERN ]]; then
+  throw "Forbidden action to add (${CUSTOM_NGINX_RULES})"
+fi
+
+if [ ! -d "${PUBLIC_FILES_DIR}" ]; then
+  throw "Public files directory (${PUBLIC_FILES_DIR}) doesn't exist"
+fi
+
+if [ -z "${!KUBERNETES_TOKEN_ENV}" ]; then
+  throw "Environment variable ${kubernetes_token_env:-KUBERNETES_DEV_TOKEN} is not set"
+fi
+
+if [ -n "${CUBOS_DEV_SITE_GOOGLE_CREDENTIALS}" ]; then
+  mv "$CUBOS_DEV_SITE_GOOGLE_CREDENTIALS" /root/.boto.auth
+fi
+
+if [ "${UNDEPLOY}" = "true" ]; then
+  echo -e "section_start:$(date +%s):gcs\r\033[0K\033[34m\033[1mRemoving files from Google Cloud Storage\033[0m"
+  gsutil -m rm -r "gs://${DEPLOY_BUCKET_NAME}/${DOMAIN//\*/-}/" || true # Succeed if undeploy something that was never deployed
+else
+  echo -e "section_start:$(date +%s):gcs\r\033[0K\033[34m\033[1mUpload to Google Cloud Storage\033[0m"
+
+  gsutil -m -h "Cache-Control:no-cache, no-store, must-revalidate" rsync -a public-read -r "${PUBLIC_FILES_DIR}" "gs://${DEPLOY_BUCKET_NAME}/${DOMAIN//\*/-}/"
+fi
+
+echo -e "section_end:$(date +%s):gcs\r\033[0K"
+
+if [ "${UNDEPLOY}" = "true" ]; then
+  echo -e "section_start:$(date +%s):k8s\r\033[0K\033[34m\033[1mUndeploy from Kubernetes\033[0m"
+else
+  echo -e "section_start:$(date +%s):k8s\r\033[0K\033[34m\033[1mDeploy to Kubernetes\033[0m"
+fi
+
+if [ "${REDIRECT_404s_TO_INDEX}" = "true" ]; then
+  NGINX_RULE_ERROR_PAGE="error_page 403 404 = /index.html;"
+else
+  NGINX_RULE_ERROR_PAGE="error_page 403 = /index.html;"
+fi
+
+INGRESS_CLASS_ANNOTATION=""
+
+if [ "$DEPLOY_CLUSTER" = "CUBOS_DEV" ]; then
+  INGRESS_CLASS_ANNOTATION="kubernetes.io/ingress.class: \"${INGRESS_CLASS}\""
+fi
+
+cat <<K8S_YAML > service.yaml
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: google-cloud-storage
+  namespace: ${NAMESPACE}
+spec:
+  type: ExternalName
+  externalName: storage.googleapis.com
+K8S_YAML
+
+INGRESS_API_VERSION="networking.k8s.io/v1"
+
+if [ -n "$FF_KUBE_TEMPLATES_DISABLE_INGRESS_V1" ]; then
+  INGRESS_API_VERSION="extensions/v1beta1"
+fi
+
+cat <<K8S_YAML > ingress.yaml
+---
+apiVersion: ${INGRESS_API_VERSION}
+kind: Ingress
+metadata:
+  name: static-${PROJECT}${INGRESS_SUFFIX}
+  namespace: ${NAMESPACE}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: "/${DEPLOY_BUCKET_NAME}/${DOMAIN//\*/-}/\$1"
+    nginx.ingress.kubernetes.io/upstream-vhost: "storage.googleapis.com"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_intercept_errors on;
+      proxy_hide_header last-modified;
+      proxy_hide_header etag;
+      proxy_hide_header expires;
+      proxy_hide_header vary;
+      proxy_hide_header cache-control;
+      add_header cache-control "no-cache, no-store, must-revalidate";
+$(echo "$CUSTOM_NGINX_RULES" | sed 's/^/      /')
+      ${NGINX_RULE_ERROR_PAGE}
+    ${INGRESS_CLASS_ANNOTATION}
+spec:
+  tls:
+  - secretName: ${CERTIFICATE_SECRET}
+  rules:
+  - host: "${DOMAIN}"
+    http:
+      paths:
+      - path: /?(.*)
+K8S_YAML
+
+if [ -n "$FF_KUBE_TEMPLATES_DISABLE_INGRESS_V1" ]; then
+  cat <<K8S_YAML >> ingress.yaml
+        backend:
+          serviceName: google-cloud-storage
+          servicePort: 80
+K8S_YAML
+
+else
+  cat <<K8S_YAML >> ingress.yaml
+        pathType: Prefix
+        backend:
+          service:
+            name: google-cloud-storage
+            port:
+              number: 80
+K8S_YAML
+fi
+
+if [ "${FORCE_PRODUCTION_CLUSTER}" = "true" ]; then
+  echo -e "\033[95m⚠ You're deploying a development website to production cluster! We hope you know what you're doing.\033[39m"
+  cluster_from_env KUBERNETES_TOKEN
+else
+  if [ "$DEPLOY_CLUSTER" = "CUBOS_DEV" ] && [ -z "${CUBOS_DEV_K8S_TOKEN}" ]; then
+    export CUBOS_DEV_K8S_TOKEN="${!KUBERNETES_TOKEN_ENV}"
+  fi
+
+  cluster_from_env "$DEPLOY_CLUSTER"
+fi
+
+if [ "${UNDEPLOY}" = "true" ]; then
+  kubectl delete -f ingress.yaml
+else
+  kubectl apply -f ingress.yaml
+  kubectl apply -f service.yaml
+fi
+
+echo -e "section_end:$(date +%s):k8s\r\033[0K"

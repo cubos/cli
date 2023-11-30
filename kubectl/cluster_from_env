@@ -1,0 +1,23 @@
+#!/bin/bash
+set -e
+
+SERVER_NAME_ENV_VAR="${1}_K8S_SERVER_NAME"
+SERVER_URL_ENV_VAR="${1}_K8S_SERVER_URL"
+SERVER_CA_ENV_VAR="${1}_K8S_SERVER_CA"
+TOKEN_ENV_VAR="${1}_K8S_TOKEN"
+
+if [ -n "${!SERVER_URL_ENV_VAR}" ] && [ -n "${!SERVER_CA_ENV_VAR}" ] && [ -n "${!TOKEN_ENV_VAR}" ]; then
+  SERVER_NAME="${!SERVER_NAME_ENV_VAR:-ci}"
+  SERVER_URL="${!SERVER_URL_ENV_VAR}"
+  SERVER_CA="${!SERVER_CA_ENV_VAR}"
+  TOKEN="${!TOKEN_ENV_VAR}"
+else
+  echo -e "\033[1m\033[36m⛔ As variávies de ambiente '${1}_K8S_SERVER_NAME' (opcional), '${1}_K8S_SERVER_URL', '${1}_K8S_SERVER_CA' e '${1}_K8S_TOKEN' não foram definidas. Você esqueceu de definir ou proteger sua branch?\033[0m"
+  exit 1
+fi
+
+kubectl config set-cluster "${SERVER_NAME}" --server="${SERVER_URL}"
+kubectl config set clusters."${SERVER_NAME}".certificate-authority-data "${SERVER_CA}"
+kubectl config set-credentials ci --token="${TOKEN}"
+kubectl config set-context "${SERVER_NAME}"-deploy --cluster="${SERVER_NAME}" --user=ci
+kubectl config use-context "${SERVER_NAME}"-deploy

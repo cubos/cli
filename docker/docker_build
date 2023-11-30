@@ -1,0 +1,42 @@
+#!/bin/bash
+set -e
+
+DOCKERFILE_PATH=${1}
+PUSH_TARGET=${2}
+PLATFORMS=${3:-linux/arm64/v8,linux/amd64}
+
+if [ -z "${DOCKERFILE_PATH}" ] || [ ! -f "${DOCKERFILE_PATH}" ]
+then
+  echo "You must specify a Dockerfile path as the first argument to 'docker_build'" >&2
+  exit 1
+fi
+
+if [ ! -f .dockerignore ] && [ -f .gitignore ]
+then
+  cp .gitignore .dockerignore
+fi
+
+gitlab_registry_login() {
+  docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+}
+
+if [ -f "$HOME/.docker/config.json" ]; then
+  REGISTRY_LOGIN=$(jq -r '.auths."'"$CI_REGISTRY"'".auth' "$HOME/.docker/config.json")
+
+  if [ "$REGISTRY_LOGIN" == "null" ]; then
+    gitlab_registry_login
+  else
+    echo "Already logged in to $CI_REGISTRY, skipping authentication…"
+  fi
+else
+  gitlab_registry_login
+fi
+
+docker buildx create --use
+
+if [ -z "${PUSH_TARGET}" ]
+then
+  docker buildx build --force-rm --pull --platform "$PLATFORMS" -f "$DOCKERFILE_PATH" .
+else
+  docker buildx build --force-rm --pull --platform "$PLATFORMS" -f "$DOCKERFILE_PATH" -t "$PUSH_TARGET" --push .
+fi

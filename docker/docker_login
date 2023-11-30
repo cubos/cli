@@ -1,0 +1,20 @@
+#!/bin/bash
+# Usage:
+#  docker_login <registry> <username> <password>
+#
+# Example:
+#  docker_login $CI_REGISTRY $CI_REGISTRY_USER $CI_REGISTRY_PASSWORD
+#
+set -e
+
+REGISTRY="$1"
+USERNAME="$2"
+PASSWORD="$3"
+
+if [ -z "${REGISTRY}" ] || [ -z "${USERNAME}" ] || [ -z "${PASSWORD}" ]; then
+  echo "You must specify a registry, username and password to 'docker_login'" >&2
+  echo "Example: docker_login \$CI_REGISTRY \$CI_REGISTRY_USER \$CI_REGISTRY_PASSWORD" >&2
+  exit 1
+fi
+
+docker login -u "$USERNAME" -p "$PASSWORD" "$REGISTRY"

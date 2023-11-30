@@ -1,0 +1,90 @@
+#!/bin/bash
+set -e
+
+rm -f tsconfig.json package.json
+npx tsc --init --target es2018 --lib es2018 --strict false --noImplicitAny false > /dev/null
+
+mkdir -p node_modules/@cubos
+rm -rf node_modules/@cubos/kube-templates
+ln -s /usr/local/lib/node_modules/@cubos/kube-templates node_modules/@cubos/kube-templates
+
+mkdir -p node_modules/@types
+rm -rf node_modules/@types/node
+ln -s /usr/local/lib/node_modules/@types/node node_modules/@types/node
+
+cat > __deploy.ts <<EOF
+  import * as fs from "fs";
+
+  for (const file of fs.readdirSync("deploy")) {
+    if (file.match(/\.ts$/)) {
+      const result = require(\`./deploy/\${file}\`);
+
+      if ("default" in result && Array.isArray(result.default)) {
+        result.default.forEach((item: { yaml?: string }) => {
+          if ("yaml" in item) {
+            console.log(item.yaml);
+          }
+        });
+      }
+    }
+  }
+EOF
+
+cat > __deploy_sts.ts <<EOF
+  import * as fs from "fs";
+
+  for (const file of fs.readdirSync("deploy")) {
+    if (file.match(/\.ts$/)) {
+      const result = require(\`./deploy/\${file}\`);
+
+      if ("default" in result && Array.isArray(result.default)) {
+        result.default.forEach((item: { yaml?: string }) => {
+          if ("yaml" in item) {
+            const yaml = item.yaml;
+
+            if (yaml.includes("StatefulSet")) {
+              console.log(item.yaml);
+            }
+          }
+        });
+      }
+    }
+  }
+EOF
+
+(
+  ts-node __deploy.ts
+  for file in $(ls deploy/*.yml 2>/dev/null); do
+    echo "---"
+    grep -q "<%" $file && cat $file
+  done > tmp_deploy_ejs.yml
+  ejs-cli tmp_deploy_ejs.yml
+  for file in $(ls deploy/*.yml 2>/dev/null); do
+    echo "---"
+    grep -q "<%" $file || cat $file
+  done
+) > tmp_deploy.yml
+
+set +e
+
+status=$(kubectl apply -f tmp_deploy.yml 2>&1)
+statusresult=$?
+
+set -e
+
+if [ $statusresult -eq 0 ]; then
+  echo "$status"
+  exit 0
+fi
+
+if echo "$status" | grep -q "spec: Forbidden: updates to statefulset spec for fields other than"; then
+  echo "$status"
+  echo "Trying to replace statefulsets"
+  ts-node __deploy_sts.ts > tmp_deploy_sts.yml
+  kubectl replace --force -f tmp_deploy_sts.yml || (tail -n +1 tmp_deploy.yml && exit 1)
+  kubectl apply -f tmp_deploy.yml || (tail -n +1 tmp_deploy.yml && exit 1)
+else
+  echo "$status"
+  tail -n +1 tmp_deploy.yml
+  exit 1
+fi

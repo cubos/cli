@@ -1,0 +1,133 @@
+#!/bin/bash -e
+#!# Script de deploy para o Firebase Hosting
+#!#
+#!# Uso:
+#!#  deploy_firebase_hosting [public_files_dir]
+#!#
+#!# Variáveis de ambiente:
+#!#  - SITE_ID: ID do site no Firebase Hosting
+#!#  - GOOGLE_SERVICE_ACCOUNT: JSON com as credenciais do serviço do Google
+#!#  - redirect_404s_to_index: redirecionar 404s para o index.html (padrão: true)
+#!#  - clean_urls: habilitar URLs limpas (omitir o .html dos arquivos) (padrão: false)
+#!#  - public_files_dir: diretório com os arquivos públicos (compatibilidade) (padrão: dist)
+#!#
+
+. "$(dirname "${BASH_SOURCE[0]}")/helpers/_all.sh"
+
+needs_command base64
+needs_command firebase
+needs_command jq
+needs_command sponge
+
+needs_env GOOGLE_SERVICE_ACCOUNT
+needs_env SITE_ID
+
+# User-defined variables
+PUBLIC_FILES_DIR="${1:-${public_files_dir:-dist}}"
+REDIRECT_404s_TO_INDEX="${redirect_404s_to_index:-true}"
+CLEAN_URLs="${clean_urls:-false}"
+
+if [ -n "$public_files_dir" ]; then
+  log_w "'public_files_dir' is deprecated, remove it and use as the first argument instead: deploy_firebase_hosting public"
+fi
+
+echo -e "${C_FIREBASE}DEPLOYING TO:\n"
+echo -e "███████╗██╗██████╗ ███████╗██████╗  █████╗ ███████╗███████╗"
+echo -e "██╔════╝██║██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔════╝██╔════╝"
+echo -e "█████╗  ██║██████╔╝█████╗  ██████╔╝███████║███████╗█████╗"
+echo -e "██╔══╝  ██║██╔══██╗██╔══╝  ██╔══██╗██╔══██║╚════██║██╔══╝"
+echo -e "██║     ██║██║  ██║███████╗██████╔╝██║  ██║███████║███████╗"
+echo -e "╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝"
+echo -e "██╗  ██╗ ██████╗ ███████╗████████╗██╗███╗   ██╗ ██████╗"
+echo -e "██║  ██║██╔═══██╗██╔════╝╚══██╔══╝██║████╗  ██║██╔════╝"
+echo -e "███████║██║   ██║███████╗   ██║   ██║██╔██╗ ██║██║  ███╗"
+echo -e "██╔══██║██║   ██║╚════██║   ██║   ██║██║╚██╗██║██║   ██║"
+echo -e "██║  ██║╚██████╔╝███████║   ██║   ██║██║ ╚████║╚██████╔╝"
+echo -e "╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═╝╚═╝  ╚═══╝ ╚═════╝"
+echo -e "${C_RESET}"
+
+echo "-- SITE DEPLOY CONFIG --"
+log_env "Public Files Directory" "${PUBLIC_FILES_DIR}"
+log_env "Should redirect 404's to index.html" "${REDIRECT_404s_TO_INDEX}"
+log_env "Clean URLs (omit .html)" "${CLEAN_URLs}"
+log_env "Site ID" "${SITE_ID} (https://${SITE_ID}.web.app/)"
+echo -e "------------------------------------\n"
+
+if [ ! -f firebase.json ]; then
+    cat <<FIREBASE_JSON > firebase.json
+{
+  "hosting": {
+    "public": "${PUBLIC_FILES_DIR}",
+    "ignore": ["firebase.json", "**/.*", "**/*.map", "**/*.map.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=900, stale-while-revalidate=180"
+          }
+        ]
+      },
+      {
+        "source":
+          "**/*.@(jpg|jpeg|gif|png|svg|webp|js|css|eot|otf|ttf|ttc|woff|woff2|font.css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=604800"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
+FIREBASE_JSON
+
+  if [ "${REDIRECT_404s_TO_INDEX}" != "true" ]; then
+    jq '.hosting.rewrites = []' firebase.json | sponge firebase.json
+  fi
+
+  if [ "${CLEAN_URLs}" == "true" ]; then
+    jq '.hosting.cleanUrls = true' firebase.json | sponge firebase.json
+  fi
+
+  log_i "firebase.json was created automatically"
+fi
+
+echo "${GOOGLE_SERVICE_ACCOUNT}" | base64 -d > credentials.json
+jq '.hosting.site = "'"${SITE_ID}"'"' firebase.json | sponge firebase.json
+
+if [ ! -f ".firebaserc" ]; then
+  PROJECT_ID=$(jq '.project_id' -r credentials.json)
+  echo -e "{\n  \"projects\": {\n    \"default\": \"${PROJECT_ID}\"\n  }\n}\n" > .firebaserc
+
+  log_i ".firebaserc was created automatically:${C_RESET} will deploy to '${PROJECT_ID}'"
+fi
+
+# --- Configuration File ---
+
+gitlab_ci_section_start config "Configuration File" true
+
+log_i ".firebaserc:"
+jq -C . .firebaserc
+
+log_i "firebase.json:"
+jq -C . firebase.json
+
+gitlab_ci_section_end config
+
+# --- Deploy to Firebase ---
+
+gitlab_ci_section_start deploy "Deploy to Firebase"
+
+GOOGLE_APPLICATION_CREDENTIALS=credentials.json firebase deploy --only hosting:"${SITE_ID}" -m "Pipeline ${CI_PIPELINE_ID:-${BITBUCKET_PIPELINE_UUID:-${GITHUB_RUN_ID}}} - Build ${CI_BUILD_ID:-${BITBUCKET_BUILD_NUMBER:-${GITHUB_RUN_ATTEMPT}}}"
+rm credentials.json
+
+gitlab_ci_section_end deploy
