@@ -47,6 +47,7 @@ This repository contains a Docker image with a set of tools preinstalled and use
       - main
     script:
       - cluster_from_env CLUSTER_PRD
+      - deploy
   ```
 
 ## Contributing
