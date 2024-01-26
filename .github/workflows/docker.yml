@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - alpine3.18
 
 jobs:
   docker:
@@ -43,5 +44,16 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64/v8
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+
+      - name: Build and Push - Alpine 3.18 🚀
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.alpine3.18
+          push: true
+          platforms: linux/amd64,linux/arm64/v8
+          tags: cubos/cli:alpine3.18
           labels: ${{ steps.meta.outputs.labels }}
           provenance: true
