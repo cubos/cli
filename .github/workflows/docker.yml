@@ -3,7 +3,6 @@ name: Docker Image
 on:
   push:
     branches:
-      - main
       - alpine3.18
 
 jobs:
@@ -36,16 +35,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-      - name: Build and Push 🚀
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64/v8
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          provenance: true
 
       - name: Build and Push - Alpine 3.18 🚀
         uses: docker/build-push-action@v5
