@@ -12,7 +12,7 @@ RUN apk add --update docker libc6-compat libssl3 git nano openssh python3 py3-pi
 COPY --from=composer:2.6 /usr/bin/composer /usr/local/bin/composer
 
 ENV CLOUDSDK_INSTALL_DIR /usr/local/gcloud/
-ARG CLOUD_SDK_VERSION=448.0.0
+ARG CLOUD_SDK_VERSION=479.0.0
 RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${CLOUD_SDK_VERSION}-linux-x86_64.tar.gz \
   && tar xzf google-cloud-sdk-${CLOUD_SDK_VERSION}-linux-x86_64.tar.gz \
   && rm google-cloud-sdk-${CLOUD_SDK_VERSION}-linux-x86_64.tar.gz \
