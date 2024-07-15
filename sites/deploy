@@ -265,6 +265,7 @@ $(echo "$CUSTOM_NGINX_RULES" | sed 's/^/      /')
       ${NGINX_RULE_ERROR_PAGE}
     ${INGRESS_CLASS_ANNOTATION}
 spec:
+  ingressClassName: ${INGRESS_CLASS}
   tls:
   - secretName: ${CERTIFICATE_SECRET}
   rules:
