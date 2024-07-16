@@ -258,7 +258,7 @@ metadata:
 $(echo "$CUSTOM_NGINX_RULES" | sed 's/^/      /')
       ${NGINX_RULE_ERROR_PAGE}
 spec:
-$(if [ -n "$INGRESS_CLASS" ]; then echo "  ingressClassName: ${INGRESS_CLASS}"; fi)
+  $(if [ -n "$INGRESS_CLASS" ]; then echo "ingressClassName: ${INGRESS_CLASS}"; fi)
   tls:
   - secretName: ${CERTIFICATE_SECRET}
   rules:
