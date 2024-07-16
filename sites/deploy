@@ -219,12 +219,6 @@ else
   NGINX_RULE_ERROR_PAGE="error_page 403 = /index.html;"
 fi
 
-INGRESS_CLASS_ANNOTATION=""
-
-if [ "$DEPLOY_CLUSTER" = "CUBOS_DEV" ]; then
-  INGRESS_CLASS_ANNOTATION="kubernetes.io/ingress.class: \"${INGRESS_CLASS}\""
-fi
-
 cat <<K8S_YAML > service.yaml
 ---
 kind: Service
@@ -263,7 +257,6 @@ metadata:
       add_header cache-control "no-cache, no-store, must-revalidate";
 $(echo "$CUSTOM_NGINX_RULES" | sed 's/^/      /')
       ${NGINX_RULE_ERROR_PAGE}
-    ${INGRESS_CLASS_ANNOTATION}
 spec:
   ingressClassName: ${INGRESS_CLASS}
   tls:
