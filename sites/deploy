@@ -237,7 +237,7 @@ if [ -n "$FF_KUBE_TEMPLATES_DISABLE_INGRESS_V1" ]; then
   INGRESS_API_VERSION="extensions/v1beta1"
 fi
 
-cat <<K8S_YAML > ingress.yaml
+cat <<K8S_YAML | sed '/^\s*$/d' > ingress.yaml
 ---
 apiVersion: ${INGRESS_API_VERSION}
 kind: Ingress
@@ -258,7 +258,7 @@ metadata:
 $(echo "$CUSTOM_NGINX_RULES" | sed 's/^/      /')
       ${NGINX_RULE_ERROR_PAGE}
 spec:
-  ingressClassName: ${INGRESS_CLASS}
+$(if [ -n "$INGRESS_CLASS" ]; then echo "  ingressClassName: ${INGRESS_CLASS}"; fi)
   tls:
   - secretName: ${CERTIFICATE_SECRET}
   rules:
