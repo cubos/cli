@@ -67,7 +67,7 @@ PROJECT="${project:-site}"
 DEPLOY_BASE_DOMAIN="${CUBOS_DEV_SITE_DEPLOY_BASE_DOMAIN:-${GROUP}.cubos.dev}"
 DOMAIN="${domain:-${ENVIRONMENT}-${PROJECT}.${DEPLOY_BASE_DOMAIN}}"
 CERTIFICATE_SECRET="${certificate_secret:-cert-${DEPLOY_BASE_DOMAIN//./-}}"
-INGRESS_CLASS="${ingress:-private}"
+INGRESS_CLASS="${ingress}"
 INGRESS_SUFFIX="${ingress_suffix}"
 FORCE_PRODUCTION_CLUSTER="${force_production_cluster:-false}"
 CLEAN_URLs="${clean_urls:-false}"
@@ -219,12 +219,6 @@ else
   NGINX_RULE_ERROR_PAGE="error_page 403 = /index.html;"
 fi
 
-INGRESS_CLASS_ANNOTATION=""
-
-if [ "$DEPLOY_CLUSTER" = "CUBOS_DEV" ]; then
-  INGRESS_CLASS_ANNOTATION="kubernetes.io/ingress.class: \"${INGRESS_CLASS}\""
-fi
-
 cat <<K8S_YAML > service.yaml
 ---
 kind: Service
@@ -243,7 +237,7 @@ if [ -n "$FF_KUBE_TEMPLATES_DISABLE_INGRESS_V1" ]; then
   INGRESS_API_VERSION="extensions/v1beta1"
 fi
 
-cat <<K8S_YAML > ingress.yaml
+cat <<K8S_YAML | sed '/^\s*$/d' > ingress.yaml
 ---
 apiVersion: ${INGRESS_API_VERSION}
 kind: Ingress
@@ -263,8 +257,8 @@ metadata:
       add_header cache-control "no-cache, no-store, must-revalidate";
 $(echo "$CUSTOM_NGINX_RULES" | sed 's/^/      /')
       ${NGINX_RULE_ERROR_PAGE}
-    ${INGRESS_CLASS_ANNOTATION}
 spec:
+  $(if [ -n "$INGRESS_CLASS" ]; then echo "ingressClassName: ${INGRESS_CLASS}"; fi)
   tls:
   - secretName: ${CERTIFICATE_SECRET}
   rules:
