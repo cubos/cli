@@ -53,11 +53,13 @@ cat > __deploy_sts.ts <<EOF
 EOF
 
 (
+  cat deploy/*.ejs 2>/dev/null > tmp_deploy_ejs.yml
+  echo "---"
   ts-node __deploy.ts
   for file in $(ls deploy/*.yml 2>/dev/null); do
     echo "---"
     grep -q "<%" $file && cat $file
-  done > tmp_deploy_ejs.yml
+  done >> tmp_deploy_ejs.yml
   ejs-cli tmp_deploy_ejs.yml
   for file in $(ls deploy/*.yml 2>/dev/null); do
     echo "---"
