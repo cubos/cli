@@ -19,7 +19,7 @@ jobs:
         with:
           images: ${{ github.repository }}
           flavor: |
-            latest=true
+            latest=${{ github.event.release.prerelease == false }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
