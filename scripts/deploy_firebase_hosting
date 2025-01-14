@@ -145,6 +145,10 @@ gitlab_ci_section_end config
 
 gitlab_ci_section_start deploy "Deploy to Firebase"
 
+if [ "${ENABLE_WEBFRAMEWORKS}" == "true" ]; then
+  firebase experiments:enable webframeworks
+fi
+
 GOOGLE_APPLICATION_CREDENTIALS=credentials.json firebase deploy --only hosting:"${SITE_ID}" -m "Pipeline ${CI_PIPELINE_ID:-${BITBUCKET_PIPELINE_UUID:-${GITHUB_RUN_ID}}} - Build ${CI_BUILD_ID:-${BITBUCKET_BUILD_NUMBER:-${GITHUB_RUN_ATTEMPT}}}"
 rm credentials.json
 
