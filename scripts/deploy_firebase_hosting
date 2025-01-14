@@ -10,6 +10,8 @@
 #!#  - redirect_404s_to_index: redirecionar 404s para o index.html (padrão: true)
 #!#  - clean_urls: habilitar URLs limpas (omitir o .html dos arquivos) (padrão: false)
 #!#  - public_files_dir: diretório com os arquivos públicos (compatibilidade) (padrão: dist)
+#!#  - enable_webframeworks: habilitar o suporte de webframeworks (experimental) (padrão: false)
+#!#  - ssr_region: região para o suporte de Server-Side Rendering de webframeworks (padrão: us-east1 | Regiões disponíveis: us-central1, us-east1, us-west1, asia-east1, europe-west1)
 #!#
 
 . "$(dirname "${BASH_SOURCE[0]}")/helpers/_all.sh"
@@ -26,6 +28,8 @@ needs_env SITE_ID
 PUBLIC_FILES_DIR="${1:-${public_files_dir:-dist}}"
 REDIRECT_404s_TO_INDEX="${redirect_404s_to_index:-true}"
 CLEAN_URLs="${clean_urls:-false}"
+ENABLE_WEBFRAMEWORKS="${enable_webframeworks:-false}"
+SSR_REGION="${ssr_region:-us-east1}"
 
 if [ -n "$public_files_dir" ]; then
   log_w "'public_files_dir' is deprecated, remove it and use as the first argument instead: deploy_firebase_hosting public"
@@ -51,6 +55,8 @@ log_env "Public Files Directory" "${PUBLIC_FILES_DIR}"
 log_env "Should redirect 404's to index.html" "${REDIRECT_404s_TO_INDEX}"
 log_env "Clean URLs (omit .html)" "${CLEAN_URLs}"
 log_env "Site ID" "${SITE_ID} (https://${SITE_ID}.web.app/)"
+log_env "Enable webframeworks experiment" "${ENABLE_WEBFRAMEWORKS}"
+log_env "SSR Region" "${SSR_REGION}"
 echo -e "------------------------------------\n"
 
 if [ ! -f firebase.json ]; then
