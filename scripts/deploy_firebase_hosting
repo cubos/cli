@@ -112,6 +112,10 @@ FIREBASE_JSON
     jq '.hosting.cleanUrls = true' firebase.json | sponge firebase.json
   fi
 
+  if [ "${ENABLE_WEBFRAMEWORKS}" == "true" ]; then
+    jq '.hosting.frameworksBackend = { "region": "'"${SSR_REGION}"'" }' firebase.json | sponge firebase.json
+  fi
+
   log_i "firebase.json was created automatically"
 fi
 
