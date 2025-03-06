@@ -12,7 +12,7 @@
 #!#  - public_files_dir: diretório com os arquivos públicos (compatibilidade) (padrão: dist)
 #!#  - enable_webframeworks: habilitar o suporte de webframeworks (experimental) (padrão: false)
 #!#  - ssr_region: região para o suporte de Server-Side Rendering de webframeworks (padrão: us-east1 | Regiões disponíveis: us-central1, us-east1, us-west1, asia-east1, europe-west1)
-#!#
+#!#  - custom_csp_rules: valor do header Content-Security-Policy customizado (padrão: frame-ancestors 'self';)
 
 . "$(dirname "${BASH_SOURCE[0]}")/helpers/_all.sh"
 
