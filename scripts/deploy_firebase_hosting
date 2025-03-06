@@ -30,6 +30,7 @@ REDIRECT_404s_TO_INDEX="${redirect_404s_to_index:-true}"
 CLEAN_URLs="${clean_urls:-false}"
 ENABLE_WEBFRAMEWORKS="${enable_webframeworks:-false}"
 SSR_REGION="${ssr_region:-us-east1}"
+CUSTOM_CSP_RULES="${custom_csp_rules:-frame-ancestors 'self';}"
 
 if [ -n "$public_files_dir" ]; then
   log_w "'public_files_dir' is deprecated, remove it and use as the first argument instead: deploy_firebase_hosting public"
@@ -79,7 +80,7 @@ if [ ! -f firebase.json ]; then
           },
           {
             "key": "Content-Security-Policy",
-            "value": "frame-ancestors 'self';"
+            "value": "${CUSTOM_CSP_RULES}"
           }
         ]
       },
