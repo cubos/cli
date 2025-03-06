@@ -12,6 +12,7 @@
 #!#  - public_files_dir: diretório com os arquivos públicos (compatibilidade) (padrão: dist)
 #!#  - enable_webframeworks: habilitar o suporte de webframeworks (experimental) (padrão: false)
 #!#  - ssr_region: região para o suporte de Server-Side Rendering de webframeworks (padrão: us-east1 | Regiões disponíveis: us-central1, us-east1, us-west1, asia-east1, europe-west1)
+#!#  - custom_csp_rules: valor do header Content-Security-Policy customizado (padrão: frame-ancestors 'self';)
 #!#
 
 . "$(dirname "${BASH_SOURCE[0]}")/helpers/_all.sh"
@@ -30,6 +31,7 @@ REDIRECT_404s_TO_INDEX="${redirect_404s_to_index:-true}"
 CLEAN_URLs="${clean_urls:-false}"
 ENABLE_WEBFRAMEWORKS="${enable_webframeworks:-false}"
 SSR_REGION="${ssr_region:-us-east1}"
+CUSTOM_CSP_RULES="${custom_csp_rules:-frame-ancestors 'self';}"
 
 if [ -n "$public_files_dir" ]; then
   log_w "'public_files_dir' is deprecated, remove it and use as the first argument instead: deploy_firebase_hosting public"
@@ -79,7 +81,7 @@ if [ ! -f firebase.json ]; then
           },
           {
             "key": "Content-Security-Policy",
-            "value": "frame-ancestors 'self';"
+            "value": "${CUSTOM_CSP_RULES}"
           }
         ]
       },
