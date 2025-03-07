@@ -74,6 +74,7 @@ CLEAN_URLs="${clean_urls:-false}"
 DEPLOY_BUCKET_NAME="${CUBOS_DEV_SITE_DEPLOY_BUCKET:-cubos-dev-sites}"
 DEPLOY_CLUSTER="${CUBOS_DEV_SITE_DEPLOY_CLUSTER:-CUBOS_DEV}"
 CUSTOM_NGINX_RULES="${custom_nginx_rules}"
+CUSTOM_CSP_RULES="${custom_csp_rules:-frame-ancestors 'self';}"
 
 if [ "${force_firebase_deploy}" = "true" ] || ([ "${trunk_based}" != "true" ] && ([ "${CI_COMMIT_REF_NAME}" = "master" ] || [ "${CI_COMMIT_REF_NAME}" = "main" ])); then
   echo -e "\033[95mDEPLOYING TO:"
@@ -98,6 +99,10 @@ if [ "${force_firebase_deploy}" = "true" ] || ([ "${trunk_based}" != "true" ] &&
           {
             "key": "Cache-Control",
             "value": "max-age=900, stale-while-revalidate=180"
+          },
+          {
+            "key": "Content-Security-Policy",
+            "value": "${CUSTOM_CSP_RULES}"
           }
         ]
       },
@@ -255,6 +260,7 @@ metadata:
       proxy_hide_header vary;
       proxy_hide_header cache-control;
       add_header cache-control "no-cache, no-store, must-revalidate";
+      add_header content-security-policy "${CUSTOM_CSP_RULES}";
 $(echo "$CUSTOM_NGINX_RULES" | sed 's/^/      /')
       ${NGINX_RULE_ERROR_PAGE}
 spec:
