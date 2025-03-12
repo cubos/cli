@@ -260,7 +260,7 @@ metadata:
       proxy_hide_header vary;
       proxy_hide_header cache-control;
       add_header cache-control "no-cache, no-store, must-revalidate";
-      add_header content-security-policy "${CUSTOM_CSP_RULES}";
+      more_set_headers content-security-policy "${CUSTOM_CSP_RULES}";
 $(echo "$CUSTOM_NGINX_RULES" | sed 's/^/      /')
       ${NGINX_RULE_ERROR_PAGE}
 spec:
