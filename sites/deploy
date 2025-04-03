@@ -283,7 +283,7 @@ K8S_YAML
 
 else
   cat <<K8S_YAML >> ingress.yaml
-        pathType: Prefix
+        pathType: ImplementationSpecific
         backend:
           service:
             name: google-cloud-storage
