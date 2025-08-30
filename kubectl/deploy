@@ -58,7 +58,7 @@ EOF
     cat $file
   done > tmp_deploy_ejs.yml
   echo "---"
-  ts-node __deploy.ts
+  ts-node --compiler-options '{"module":"CommonJS","esModuleInterop":true,"types":["node"]}' __deploy.ts
   for file in $(ls deploy/*.yml 2>/dev/null); do
     echo "---"
     grep -q "<%" $file && cat $file
