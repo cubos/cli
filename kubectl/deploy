@@ -13,7 +13,7 @@ rm -rf node_modules/@types/node
 ln -s /usr/local/lib/node_modules/@types/node node_modules/@types/node
 
 cat > __deploy.ts <<EOF
-  import * as fs from "fs";
+  const fs = require("fs");
 
   for (const file of fs.readdirSync("deploy")) {
     if (file.match(/\.ts$/)) {
@@ -31,7 +31,7 @@ cat > __deploy.ts <<EOF
 EOF
 
 cat > __deploy_sts.ts <<EOF
-  import * as fs from "fs";
+  const fs = require("fs");
 
   for (const file of fs.readdirSync("deploy")) {
     if (file.match(/\.ts$/)) {
