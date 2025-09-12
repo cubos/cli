@@ -13,7 +13,7 @@ rm -rf node_modules/@types/node
 ln -s /usr/local/lib/node_modules/@types/node node_modules/@types/node
 
 cat > __deploy.ts <<EOF
-  const fs = require("fs");
+  import * as fs from "fs";
 
   for (const file of fs.readdirSync("deploy")) {
     if (file.match(/\.ts$/)) {
@@ -31,7 +31,7 @@ cat > __deploy.ts <<EOF
 EOF
 
 cat > __deploy_sts.ts <<EOF
-  const fs = require("fs");
+  import * as fs from "fs";
 
   for (const file of fs.readdirSync("deploy")) {
     if (file.match(/\.ts$/)) {
@@ -58,7 +58,7 @@ EOF
     cat $file
   done > tmp_deploy_ejs.yml
   echo "---"
-  ts-node --compiler-options '{"module":"CommonJS","esModuleInterop":true,"types":["node"]}' __deploy.ts
+  ts-node __deploy.ts
   for file in $(ls deploy/*.yml 2>/dev/null); do
     echo "---"
     grep -q "<%" $file && cat $file
