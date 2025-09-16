@@ -1,6 +1,6 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
-RUN npm i -g ejs-cli ts-node typescript @cubos/kube-templates @types/node@~20 firebase-tools && npm cache clean --force
+RUN npm i -g ejs-cli ts-node typescript @cubos/kube-templates @types/node@~24 firebase-tools && npm cache clean --force
 
 RUN apk add --update docker libc6-compat libssl3 git nano openssh python3 py3-pip py3-cffi py3-cryptography findutils gettext bash jq ca-certificates moreutils curl ruby docker-cli openssl aws-cli php php-phar php-mbstring && \
     pip install --upgrade pip --break-system-packages && \
