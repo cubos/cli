@@ -2,7 +2,20 @@
 set -e
 
 rm -f tsconfig.json package.json
-npx tsc --init --target es2018 --lib es2018 --strict false --noImplicitAny false > /dev/null
+
+cat > tsconfig.json <<EOF
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "CommonJS",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "strict": false,
+    "noImplicitAny": false
+  }
+}
+EOF
 
 mkdir -p node_modules/@cubos
 rm -rf node_modules/@cubos/kube-templates
