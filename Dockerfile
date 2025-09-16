@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:24-alpine
 
 RUN npm i -g ejs-cli ts-node typescript @cubos/kube-templates @types/node@~24 firebase-tools && npm cache clean --force
 
