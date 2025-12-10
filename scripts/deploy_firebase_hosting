@@ -61,7 +61,7 @@ log_env "Clean URLs (omit .html)" "${CLEAN_URLs}"
 log_env "Site ID" "${SITE_ID} (https://${SITE_ID}.web.app/)"
 log_env "Enable webframeworks experiment" "${ENABLE_WEBFRAMEWORKS}"
 log_env "SSR Region" "${SSR_REGION}"
-log_env "Disable Cache (LinkPJ Mode)" "${DISABLE_CACHE}"
+log_env "Disable Cache" "${DISABLE_CACHE}"
 echo -e "------------------------------------\n"
 
 if [ ! -f firebase.json ]; then
