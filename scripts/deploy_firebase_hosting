@@ -67,19 +67,28 @@ echo -e "------------------------------------\n"
 if [ ! -f firebase.json ]; then
 
   if [ "${DISABLE_CACHE}" == "true" ]; then
-    log_i "Applying NO-CACHE strategy for HTML and Long-Cache for Assets..."
-    cat <<FIREBASE_JSON > firebase.json
+    log_i "Applying NO-CACHE strategy..."
+    SOURCE_HTML="/index.html"
+    CACHE_HTML="no-cache"
+    CACHE_ASSETS="public, max-age=31536000, immutable"
+  else
+    SOURCE_HTML="/**"
+    CACHE_HTML="max-age=900, stale-while-revalidate=180"
+    CACHE_ASSETS="max-age=604800"
+  fi
+
+  cat <<FIREBASE_JSON > firebase.json
 {
   "hosting": {
     "public": "${PUBLIC_FILES_DIR}",
     "ignore": ["firebase.json", "**/.*", "**/*.map", "**/*.map.*", "**/node_modules/**"],
     "headers": [
       {
-        "source": "/index.html",
+        "source": "${SOURCE_HTML}",
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "no-cache"
+            "value": "${CACHE_HTML}"
           },
           {
             "key": "X-Content-Type-Options",
@@ -96,7 +105,7 @@ if [ ! -f firebase.json ]; then
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "no-cache"
+            "value": "${CACHE_HTML}"
           },
           {
             "key": "X-Content-Type-Options",
@@ -113,7 +122,7 @@ if [ ! -f firebase.json ]; then
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "public, max-age=31536000, immutable"
+            "value": "${CACHE_ASSETS}"
           }
         ]
       }
@@ -127,52 +136,6 @@ if [ ! -f firebase.json ]; then
   }
 }
 FIREBASE_JSON
-
-  else
-    cat <<FIREBASE_JSON > firebase.json
-{
-  "hosting": {
-    "public": "${PUBLIC_FILES_DIR}",
-    "ignore": ["firebase.json", "**/.*", "**/*.map", "**/*.map.*", "**/node_modules/**"],
-    "headers": [
-      {
-        "source": "/**",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "max-age=900, stale-while-revalidate=180"
-          },
-          {
-            "key": "X-Content-Type-Options",
-            "value": "nosniff"
-          },
-          {
-            "key": "Content-Security-Policy",
-            "value": "${CUSTOM_CSP_RULES}"
-          }
-        ]
-      },
-      {
-        "source":
-          "**/*.@(jpg|jpeg|gif|png|svg|webp|js|css|eot|otf|ttf|ttc|woff|woff2|font.css)",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "max-age=604800"
-          }
-        ]
-      }
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
-  }
-}
-FIREBASE_JSON
-  fi
 
   if [ "${REDIRECT_404s_TO_INDEX}" != "true" ]; then
     jq '.hosting.rewrites = []' firebase.json | sponge firebase.json
