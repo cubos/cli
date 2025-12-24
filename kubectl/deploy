@@ -83,11 +83,17 @@ EOF
   done
 ) > tmp_deploy.yml
 
-NAMESPACE=${ZT_CUSTOMER}
-kubectl get namespace $NAMESPACE > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-  echo "Erro: o namespace '$NAMESPACE' não foi encontrado."
-  exit 1
+NAMESPACE=$(yq -r 'select(.metadata.namespace != null) | .metadata.namespace' tmp_deploy.yml | head -n 1)
+
+if [ -n "$NAMESPACE" ]; then
+  echo "Validating namespace: $NAMESPACE"
+  kubectl get namespace $NAMESPACE > /dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    echo "Error: the namespace '$NAMESPACE' was not found."
+    exit 1
+  fi
+else
+  echo "Namespace not found in deployment YAML, skipping validation."
 fi
 
 set +e
