@@ -83,18 +83,21 @@ EOF
   done
 ) > tmp_deploy.yml
 
-NAMESPACE=$(yq -r 'select(.metadata.namespace != null) | .metadata.namespace' tmp_deploy.yml | head -n 1)
+NAMESPACES=$(yq -r 'select(.metadata.namespace != null) | .metadata.namespace' tmp_deploy.yml | sort -u)
 
-if [ -n "$NAMESPACE" ]; then
+if [ -z "$NAMESPACES" ]; then
+  echo "No namespace defined in YAML, skipping validation."
+  exit 0
+fi
+
+for NAMESPACE in $NAMESPACES; do
   echo "Validating namespace: $NAMESPACE"
-  kubectl get namespace $NAMESPACE > /dev/null 2>&1
-  if [ $? -ne 0 ]; then
-    echo "Error: the namespace '$NAMESPACE' was not found."
+
+  if ! kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
+    echo "Error: namespace '$NAMESPACE' was not found."
     exit 1
   fi
-else
-  echo "Namespace not found in deployment YAML, skipping validation."
-fi
+done
 
 set +e
 
