@@ -9,7 +9,7 @@ RUN apk add --update docker libc6-compat libssl3 git nano openssh python3 py3-pi
     apk del build-deps && \
     rm -rf /var/cache/apk/*
 
-COPY --from=composer:2.6 /usr/bin/composer /usr/local/bin/composer
+COPY --from=composer:2.9 /usr/bin/composer /usr/local/bin/composer
 
 ENV CLOUDSDK_INSTALL_DIR /usr/local/gcloud/
 ARG CLOUD_SDK_VERSION=479.0.0
