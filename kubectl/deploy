@@ -83,6 +83,11 @@ EOF
   done
 ) > tmp_deploy.yml
 
+if ! kubectl cluster-info >/dev/null 2>&1; then
+  echo "Error: Kubernetes cluster was not found. Please check your kubeconfig."
+  exit 1
+fi
+
 NAMESPACES=$(yq -r 'select(.metadata.namespace != null) | .metadata.namespace' tmp_deploy.yml | sort -u)
 
 if [ -z "$NAMESPACES" ]; then
