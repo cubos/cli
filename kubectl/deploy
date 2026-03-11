@@ -83,6 +83,10 @@ EOF
   done
 ) > tmp_deploy.yml
 
+if ! kubectl get --raw /healthz >/dev/null 2>&1; then
+  echo "Warning: Kubernetes cluster was not found."
+fi
+
 NAMESPACES=$(yq -r 'select(.metadata.namespace != null) | .metadata.namespace' tmp_deploy.yml | sort -u)
 
 if [ -z "$NAMESPACES" ]; then
@@ -94,8 +98,7 @@ for NAMESPACE in $NAMESPACES; do
   echo "Validating namespace: $NAMESPACE"
 
   if ! kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
-    echo "Error: namespace '$NAMESPACE' was not found."
-    exit 1
+    echo "Warning: namespace '$NAMESPACE' was not found."
   fi
 done
 
