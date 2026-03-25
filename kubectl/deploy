@@ -90,8 +90,7 @@ fi
 NAMESPACES=$(yq -r 'select(.metadata.namespace != null) | .metadata.namespace' tmp_deploy.yml | sort -u)
 
 if [ -z "$NAMESPACES" ]; then
-  echo "No namespace defined in YAML, skipping validation."
-  exit 0
+  echo "Warning: No namespace defined in YAML, skipping validation."
 fi
 
 for NAMESPACE in $NAMESPACES; do
